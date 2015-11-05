@@ -3,12 +3,19 @@
 #############################
 # Connect to AWS
 #############################
-# cd to the directory where AWS pen file is stored
+# cd to the directory where AWS PEM file is stored
 cd ~/Documents/AWS
-# eb2 machine configuration - r3.2xlarge: 8 cores, 61 GB ram, 160 GB storage
-# launch EC2 instance through gui and connect by terminal. click "Connect" and copy ssh command
+
+# configure aws credentials
+aws configure # provde the AWS Access Key, Secret key & region.
+
+# ec2 instance configuration - r3.2xlarge: 8 cores, 61 GB ram, 160 GB storage
+# launch EC2 instance through GUI/command line. click "Connect" and copy ssh command
+aws ec2 run-instances --image-id ami-d5ea86b5 --count 1 --instance-type r3.xlarge --key-name shruti
+
+# ssh into the ec2 instance.
 ssh -i "shruti.pem" ec2-user@54.183.33.24
-aws configure # provde the AWS Access Key and Secret key
+
 
 
 #############################
