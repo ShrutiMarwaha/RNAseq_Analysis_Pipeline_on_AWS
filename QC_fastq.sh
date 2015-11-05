@@ -14,7 +14,7 @@ aws configure # provde the AWS Access Key, Secret key & region.
 aws ec2 run-instances --image-id ami-d5ea86b5 --count 1 --instance-type r3.xlarge --key-name shruti
 
 # ssh into the ec2 instance.
-ssh -i "shruti.pem" ec2-user@54.183.33.24
+ssh -i "shruti.pem" ec2-user@<IP_ADDRESS_OF_EC2_HOST>
 
 
 
