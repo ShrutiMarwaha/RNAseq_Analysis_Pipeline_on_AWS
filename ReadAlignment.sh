@@ -26,16 +26,12 @@ echo $PATH
 # Download human reference-genome & gtf files
 #############################
 # create a folder "data" in ec2 where you want to store files 
-mkdir data
-cd data
-mkdir release82
-cd release82
-mkdir reference-genome
-cd reference-genome
+mkdir -p data/release82/reference-genome
+cd data/release82/reference-genome 
 # DOWNLOAD human reference-genome from ensemble - http://uswest.ensembl.org/info/data/ftp/index.html
 curl -O ftp://ftp.ensembl.org/pub/release-82/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz ## reference genome
 # DOWNLOAD human gtf file that contains annotation
-cd ..
+cd data
 mkdir gtf
 cd gtf
 curl -O ftp://ftp.ensembl.org/pub/release-82/gtf/homo_sapiens/Homo_sapiens.GRCh38.82.gtf.gz ## contains annotation
