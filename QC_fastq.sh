@@ -17,10 +17,12 @@ aws ec2 run-instances --image-id ami-d5ea86b5 --count 1 --instance-type r3.xlarg
 ssh -i "shruti.pem" ec2-user@<IP_ADDRESS_OF_EC2_HOST>
 
 
-
 #############################
 # Install software 
 #############################
+# FastqPairedEndValidator: Validates order of paired-end reads in given fastq files.
+curl -O http://www.mcdonaldlab.biology.gatech.edu/bioinformatics/FastqPairedEndValidator.pl
+
 # FastQC: make sure you change the version number to the latest one.
 curl -O http://www.bioinformatics.bbsrc.ac.uk/projects/fastqc/fastqc_v0.11.3.zip
 unzip fastqc_v0.11.3.zip
@@ -40,9 +42,20 @@ curl -O ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR585/SRR58557[0-4]/SRR58557[0-4]_[1
 # cross check size of files and ensure you did not get error "Recv failure: Operation timed out"
 ls -lgh
 # copy the fastq files from s3 to ec2
-# aws s3 ls s3://gse41476/
+# aws s3 ls s3://gse41476/RawFastqFiles/
 # mkdir fastq_files
-# aws s3 cp s3://gse41476/ ./fastq_files --recursive --exclude "*" --include "*.fastq.gz"
+# aws s3 cp s3://gse41476/RawFastqFiles/ ./fastq_files --recursive --exclude "*" --include "*.fastq.gz"
+
+###########################
+# Run FastqPairedEndValidator
+###########################
+gunzip *.fastq.gz
+# Run it for each of paired fastq files. If there are too many samples, run a for loop in a bash file which calls calls FastqPairedEndValidator.pl.
+perl ../FastqPairedEndValidator.pl SRR585570_1.fastq SRR585570_2.fastq
+perl ../FastqPairedEndValidator.pl SRR585571_1.fastq SRR585571_2.fastq
+perl ../FastqPairedEndValidator.pl SRR585572_1.fastq SRR585572_2.fastq
+perl ../FastqPairedEndValidator.pl SRR585573_1.fastq SRR585573_2.fastq
+perl ../FastqPairedEndValidator.pl SRR585574_1.fastq SRR585574_2.fastq
 
 
 ###########################
@@ -52,11 +65,12 @@ ls -lgh
 mkdir /home/ec2-user/fastq_files/FastQC_output
 # ./../FastQC/fastqc # to open interactive mode
 /home/ec2-user/FastQC/fastqc -help #./../FastQC/fastqc -help # command line mode
-/home/ec2-user/FastQC/fastqc --threads 4 --extract -o FastQC_output *.fastq.gz
+/home/ec2-user/FastQC/fastqc --threads 8 -o FastQC_output *.fastq
 # copy the data from ec2 to s3 bucket
 aws s3 cp /home/ec2-user/fastq_files/FastQC_output/ s3://gse41476/FastQC_output/ --recursive
 
 # analyze the FastQC results using the python script - fastqc_validator.py. This will tell which tests failed/warning. You need to manually inspect them and use biological knowledge and decide further action
+unzip "/home/ec2-user/fastq_files/FastQC_output/*.zip"
 aws s3 cp s3://rna-seq-qc/FastQC_result_analyzer.py /home/ec2-user
 python /home/ec2-user/FastQC_result_analyzer.py -d /home/ec2-user/fastq_files/FastQC_output -s FAIL
 
@@ -65,19 +79,19 @@ python /home/ec2-user/FastQC_result_analyzer.py -d /home/ec2-user/fastq_files/Fa
 # Run FastX-tool-kit to remove bases with low sequence quality. 
 ###########################
 mkdir TrimmedFastq
-# unzip files that you need to run
-gunzip SRR585574_*.fastq.gz
 
 # since it is Illumina 1.5, Qulaity score Encoding is Phred+64. https://en.wikipedia.org/wiki/FASTQ_format#Encoding. [-t N] = Trim N nucleotides from the end of the read.
-fastx_trimmer -Q64 -t 3 -i SRR585574_1.fastq -o ./TrimmedFastq/SRR585574_1_trimmed.fastq 
-fastx_trimmer -Q64 -t 3 -i SRR585574_2.fastq -o ./TrimmedFastq/SRR585574_2_trimmed.fastq 
-# run fastqc again with the trimmed files and see if all tests are pass and ok
-gzip ./TrimmedFastq/*.trimmed.fastq 
+fastx_trimmer -Q64 -t 4 -i SRR585574_1.fastq -o ./TrimmedFastq/SRR585574_1_trimmed.fastq 
+fastx_trimmer -Q64 -t 4 -i SRR585574_2.fastq -o ./TrimmedFastq/SRR585574_2_trimmed.fastq 
+# run fastqc again with the trimmed files and see if all tests pass and ok
+/home/ec2-user/FastQC/fastqc --threads 8 -o TrimmedFastq TrimmedFastq/*.fastq
+unzip "TrimmedFastq/*.zip" -d ./TrimmedFastq
+python /home/ec2-user/FastQC_result_analyzer.py -d /home/ec2-user/fastq_files/TrimmedFastq -s FAIL
+gzip ./TrimmedFastq/*trimmed.fastq 
 
 # add all processed fastq files in one folder and as compressed files
 mkdir ProcessedFastqFiles
 mv ./TrimmedFastq/*_trimmed.fastq.gz ./ProcessedFastqFiles/
-mv *.fastq.gz ./ProcessedFastqFiles/
 
 # save files to S3
 aws s3 cp /home/ec2-user/fastq_files/ProcessedFastqFiles s3://gse41476/ProcessedFastqFiles/ --recursive
