@@ -20,6 +20,7 @@ cd STAR-STAR_2.4.2a
 ls /home/ec2-user/STAR-STAR_2.4.2a/bin/Linux_x86_64_static
 export PATH=/home/ec2-user/STAR-STAR_2.4.2a/bin/Linux_x86_64_static:$PATH
 echo $PATH
+cd ..
 
 
 #############################
@@ -44,7 +45,7 @@ aws s3 cp /home/ec2-user/data/release82 s3://human-genome --recursive
 #############################
 # Generate Genome Index
 #############################
-# if you have already saved genome index, skip the above step and load it from S3 using following 2 commands
+# if you have already saved genome index, skip the above and following step and load it from S3 using following 2 commands. Jump to read Mapping step.
 # aws s3 ls s3://human-genome/release82/genome-index/
 # aws s3 cp s3://human-genome/release82/genome-index/ /home/ec2-user/data/genome-index/ --recursive
 
@@ -68,22 +69,42 @@ aws s3 sync genome-index s3://human-genome/release82/genome-index/
 #############################
 # Read Mapping
 #############################
-# copy the processed fastq files (that have passed QC) from s3 to ec2
+mkdir -p data/ReadMappingInputFiles
+cd ReadMappingInputFiles/
+# copy the processed fastq files (that have passed QC) from s3 to ec2. Files which did not need processing can also be copied directly. I have not copied them again together in a new folder to reduce S3 storage cost.
 aws s3 ls s3://gse41476/ProcessedFastqFiles/
-mkdir fastq
-aws s3 cp s3://gse41476/ProcessedFastqFiles/ ./fastq --recursive --exclude "*" --include "*.fastq.gz"
-gunzip fastq/*.fastq.gz
+aws s3 ls s3://gse41476/RawFastqFiles/
+aws s3 cp s3://gse41476/ProcessedFastqFiles/ /home/ec2-user/data/ReadMappingInputFiles/ --recursive --exclude "*" --include "*.fastq.gz"
+aws s3 cp s3://gse41476/RawFastqFiles/ /home/ec2-user/data/ReadMappingInputFiles/ --recursive --exclude "SRR585574_*.fastq.gz"
+#mkdir fastq
+#aws s3 cp s3://gse41476/ProcessedFastqFiles/ ./fastq --recursive --exclude "*" --include "*.fastq.gz"
+#aws s3 cp s3://gse41476/ ./fastq_files --recursive --exclude "*" --include "*.fastq.gz"
+gunzip *.fastq.gz
+
 
 # create a folder for storing read alignment for each sample. If there are too many samples, run a loop. You can run all files togther too. Separate paired end read by space and reads from two different samples by a comma. 
-mkdir SRR585570 
+mkdir -p data/AlignedReads/
+cd AlignedReads/
+mkdir SRR585570 SRR585571 SRR585572 SRR585573 SRR585574
+
 cd SRR585570
 --readFilesIn \ # path of directory containing sequences to be mapped (RNA-seq Fastq files). 
 --outSAMtype BAM SortedByCoordinate \ output should be sorted .bam file
 screen
-time STAR --runThreadN 8 --genomeDir ../genome-index/ --readFilesIn ../fastq/SRR585570_1.fastq ../fastq/SRR585570_2.fastq --outSAMtype BAM SortedByCoordinate 
+#time STAR --runThreadN 8 --genomeDir ../genome-index/ --readFilesIn ../fastq/SRR585570_1.fastq ../fastq/SRR585570_2.fastq --outSAMtype BAM SortedByCoordinate 
+time STAR --runThreadN 8 --genomeDir /home/ec2-user/data/genome-index/ --readFilesIn /home/ec2-user/data/ReadMappingInputFiles/SRR585570_1.fastq /home/ec2-user/data/ReadMappingInputFiles/SRR585570_2.fastq --outSAMtype BAM SortedByCoordinate 
+
+# Repeat this for each sample.
+cd ../SRR585571
+time STAR --runThreadN 8 --genomeDir /home/ec2-user/data/genome-index/ --readFilesIn /home/ec2-user/data/ReadMappingInputFiles/SRR585571_1.fastq /home/ec2-user/data/ReadMappingInputFiles/SRR585571_2.fastq --outSAMtype BAM SortedByCoordinate 
+cd ../SRR585572
+time STAR --runThreadN 8 --genomeDir /home/ec2-user/data/genome-index/ --readFilesIn /home/ec2-user/data/ReadMappingInputFiles/SRR585572_1.fastq /home/ec2-user/data/ReadMappingInputFiles/SRR585572_2.fastq --outSAMtype BAM SortedByCoordinate 
+cd ../SRR585573
+time STAR --runThreadN 8 --genomeDir /home/ec2-user/data/genome-index/ --readFilesIn /home/ec2-user/data/ReadMappingInputFiles/SRR585573_1.fastq /home/ec2-user/data/ReadMappingInputFiles/SRR585573_2.fastq --outSAMtype BAM SortedByCoordinate 
+cd ../SRR585574
+time STAR --runThreadN 8 --genomeDir /home/ec2-user/data/genome-index/ --readFilesIn /home/ec2-user/data/ReadMappingInputFiles/SRR585574_1_trimmed.fastq /home/ec2-user/data/ReadMappingInputFiles/SRR585574_2_trimmed.fastq --outSAMtype BAM SortedByCoordinate 
+
 # now copy read alignment output for each sample to S3. repeat this for each sample.
-aws s3 cp SRR585570 s3://gse41476/ReadAlignments/SRR585570
+aws s3 cp SRR585570 s3://gse41476/AlignedReads/SRR585570
 
-
-
-
+aws s3 cp AlignedReads/ s3://gse41476/AlignedReads/ --recursive
